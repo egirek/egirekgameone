@@ -1,486 +1,412 @@
+from enum import Enum
+from random import *
 import time
-from random import randint
+from pynput import keyboard
 from colorama import init, Fore
-from colorama import Back
-from colorama import Style
 
 init(autoreset=True)
+controller = keyboard.Controller()
+class Choose_Shop(Enum):
+    Bottle_Health = 1
+    UpDamage = 2
+    Healper = 3
+    Exit = 4
+    Resurect = 5
+class  Choose_Person(Enum):
+    Archer = 3
+    Soldier = 1
+    Wizzard = 2
+    Tank = 4
+    NoName = 4
+
+class Choose_Artefact(Enum):
+    Bottle_Health = 2
+    UpDamage = 1
+    CriticalDamage = 3
 
 class Person:
-    def __init__(self,artef,health):
+    damage = 10
+    name = ""
+    health = 0
+    money = 100
+    artefact = ""
+    ulta = False
+    healper = False
+    timeReastartUlta = 10
+    def __init__(self, artef, health):
         self.health = health
+        self.artefact = artef
+        if (self.artefact == Choose_Artefact.Bottle_Health):
+            self.health *= 1.2
+        if (self.artefact == Choose_Artefact.UpDamage):
+            self.damage *= 1.1
+    def make_kick(self, enemy):
+        if self.check_health():
+            print(self.name, "бьет" ,enemy.name)
+            enemy.health -= self.damage
+            self.money += randint(20,40)
+            self.crit_kick(enemy)
+            self.person_healper(enemy)
+            enemy.resetHealth()
+    def resetHealth(self):
+        if not self.check_health():
+            self.health = 0
+    def check_health(self):
+        return self.health > 0
+    def useUlta(self, enemy):
         self.ulta = False
-        self.artef = artef
-        self.life = True
-    def hill(self):
-        self.health += 10
-        print(f"{self.name} \033[32mподлечился.")
-
-    def info (self):
+    def info(self):
         if self.health == 0:
-            print(f"{self.name} \033[36m- убит ")
+            print(f"{self.name} - убит ")
         else:
-            print('%s \033[32mHP = %d' % (self.name, self.health))
-
-class Boss:
-    __damage = 40
+            print('%s HP = %d' % (self.name, self.health))
+    def person_healper(self,enemy):
+        if self.healper:
+            enemy.health -= 30
+            print("Помошник", self.name, "бьет", enemy.name)
+    def crit_kick(self, enemy):
+        if self.artefact == Choose_Artefact.CriticalDamage and randint(0,10) == 1:
+            enemy.health -= 100
+            enemy.resetHealth()
+            print(self.name, Fore.RED+ "Нанес критический удар", enemy.name)
+    def person_resurect(self):
+        self.health = 150
+        self.healper = False
+        self.ulta = False
+        print(f"{self.name} - воскрешен")
+class Shop:
+    deadPersons =[]
+    def resurect(self):
+        print(Fore.LIGHTCYAN_EX + "Выбери кого хочешь воскресить")
+        for person in self.deadPersons:
+            print(f"{person.name}")
+        try:
+            i = int(input())
+            if i == 1:
+                self.deadPersons[0].person_resurect()
+                self.deadPersons.pop(0)
+            elif i == 2:
+                self.deadPersons[1].person_resurect()
+                self.deadPersons.pop(1)
+        except:
+            print(Fore.LIGHTRED_EX + "Введено невенрное значение!")
+    def shopping(self,player, wave):
+        while player.money > 150:
+            try:
+                type = Choose_Shop(int(input(Fore.BLUE + "Выбери предмет: ")))
+            except:
+                print(Fore.LIGHTRED_EX + "Выбери из предложенных вариантов!")
+                continue
+            if type == Choose_Shop.Bottle_Health and player.money >= 150:
+                player.health += 150
+                player.money -= 150
+                print(f'{player.name} HP = {player.health}', Fore.LIGHTYELLOW_EX + f' Money = {player.money}')
+                continue
+            elif type == Choose_Shop.UpDamage and player.money >= 200:
+                player.damage *= 1.5
+                player.money -= 200
+                print(f'{player.name} Damage = {player.damage}', Fore.LIGHTYELLOW_EX + f'Money = {player.money}')
+                continue
+            elif type == Choose_Shop.Exit: break
+            elif type == Choose_Shop.Healper and player.money >= 350 and not player.healper:
+                player.healper = True
+                player.money -= 350
+                print(f'{player.name} Помошник призван', Fore.LIGHTYELLOW_EX + f' Money = {player.money}')
+                continue
+            elif (type == Choose_Shop.Resurect and
+                  player.money >= 450 and
+                  wave %4 ==0 and
+                  len(self.deadPersons) !=0):
+                player.money -= 450
+                self.resurect()
+                print(f'{player.name}', Fore.LIGHTYELLOW_EX + f' Money = {player.money}')
+            else: print(Fore.LIGHTRED_EX + "Ошибка!")
+    def print_shop(self, players, wave):
+        if (wave % 2 == 0 or wave % 5 == 0):
+            print(Fore.LIGHTBLUE_EX + "-----------------Магазин------------------")
+            print(Fore.LIGHTYELLOW_EX + "1 - Выпить зелье (HP + 150) = 150 Money\n")
+            print(Fore.LIGHTBLUE_EX + "2 - Улучшить оружие = 200 Money\n")
+            print(Fore.LIGHTCYAN_EX + "3 - Призвать помошника = 350 Money\n")
+            print(Fore.LIGHTMAGENTA_EX +"4 - Выход\n")
+            if (wave % 4 == 0):
+                print(Fore.LIGHTWHITE_EX + "Доп.слот: 5 - Воскресить союзника = 400 Money\n")
+            print(Fore.LIGHTBLUE_EX + "------------------------------------------")
+            self.buy(players,wave)
+    def buy(self,players,wave):
+        self.deadPersons.clear()
+        for person in players:
+            if person.check_health():
+                print(person.name,
+                      Fore.GREEN + f"HP = {round(person.health)}",
+                      Fore.RED + f"Damage = {round(person.damage)}",
+                      Fore.LIGHTYELLOW_EX + f"Money = {round(person.money)}")
+                self.shopping(person,wave)
+            else:
+                self.deadPersons.append(person)
+###########################################
+class Boss(Person):
+    damage = 65
     def __init__(self):
         self.name = (Fore.RED + "Boss")
-        self.health = 750
-        self.ulta = False
-        self.life = True
-
-    def make_kick(self, enemy, time1):
-        if (isinstance(enemy, Archer) == False):
-            enemy.health -= self.__damage
-        else:
-            j = randint(0, 4)
-            if (j == 1):
-                print(f"{enemy.name} \033[32m\033[4mуклонился")
-            else:
-                enemy.health -= self.__damage
-        if enemy.health < 0:
-            enemy.health = 0
-        krit = randint(0, 25)
-        if (krit == 1):
-            enemy.health -= 110
-            print(self.name, "\033[31mНанес критический удар", enemy.name)
-            if enemy.health < 0:
-                enemy.health = 0
-        print(self.name, "бьет", enemy.name)
-        if (time1 >= 15 and self.ulta == False):
-            self.ulta = True
-            ran = randint(0, 15)
-            if (ran == 1):
-                enemy.health *= 0.4
-                print(f"{self.name} \033[33mиспользовал свою способность - "
-                      f"{enemy.name} потерял 60 %")
-            enemy.health -= 15
-            if enemy.health < 0:
-                enemy.health = 0
-            print(f"{self.name} \033[33m нанес доп.урон ")
-    def splash (self,enemy1,enemy2):
-        enemy1.health -= 35
-        enemy2.health -= 35
-        if enemy1.health < 0:
-            enemy1.health = 0
-        if enemy2.health < 0:
-            enemy2.health = 0
-        print(f"{self.name} \033[31mнанес рассекающий удар")
-    def info (self):
-        print('%s \033[32mHP = %d' % (self.name, self.health))
-
-class Tank(Person):
-    __damage = 10
-    def __init__(self, artef, name='Noname', health=200):
-        self.name = (Fore.CYAN + name + " (Tank)")
-        super().__init__(artef,health)
-        if (self.artef == 2):
-            self.health *= 1.2
-
-    def make_kick(self, enemy, time1):
-        if (isinstance(enemy, Archer) == False):
-            if (self.artef == 1):
-                enemy.health -= self.__damage * 1.1
-            else:
-                enemy.health -= self.__damage
-        else:
-            j = randint(0, 5)
-            if (j == 1):
-                print(f"{enemy.name} \033[32m\033[4mуклонился.")
-            else:
-                if (self.artef == 1):
-                    enemy.health -= self.__damage * 1.1
-                else:
-                    enemy.health -= self.__damage
-        if enemy.health < 0:
-            enemy.health = 0
-        self.health += 5
-        print(self.name, "бьет", enemy.name)
-        krit = randint(0, 10)
-        if (self.artef == 3):
-            if (krit == 1 and self.life == True):
-                enemy.health -= 100
-                print(self.name, "\033[31mНанес критический удар", enemy.name)
-                if enemy.health < 0:
-                    enemy.health = 0
-        if (time1 >= 10 and self.ulta == False):
-            self.ulta = True
-            self.__damage *= 1.2
-            print(f"{self.name} \033[33mиспользовал свою способность - Урон был увеличен на 20%")
-
-class Archer(Person):
-    __damage = 30
-    def __init__(self, artef, name='Noname', health=75):
-        self.name = (Fore.BLUE + name + " (Archer)")
-        super().__init__(artef, health)
-        if (self.artef == 2):
-            self.health *= 1.2
-          
-    def make_kick(self, enemy, time1):
-        if (self.artef == 1):
-            enemy.health -= self.__damage * 1.1
-        else:
-            enemy.health -= self.__damage
-        if enemy.health < 0:
-            enemy.health = 0
-        print(self.name, "бьет", enemy.name)
-        self.health += 8
-        krit = randint(0, 10)
-      
-        if (self.artef == 3):
-            if (krit == 1):
-                enemy.health -= 100
-                print(self.name, "\033[31mНанес критический удар", enemy.name)
-                if enemy.health < 0:
-                    enemy.health = 0
-        if (time1 >= 10 and self.ulta == False):
-            self.ulta = True
-            enemy.health -= 30 * randint(1, 3)
-            if enemy.health < 0:
-                enemy.health = 0
-            print(f"{self.name} \033[33mиспользовал свою способность - отправил град стрел")
-
-class Wizzard(Person):
-    __damage = 20
-    def __init__(self, artef, name='Noname', health=75):
-        self.name = (Fore.MAGENTA + name + " (Wizzard)")
-        super().__init__(artef, health)
-        if (self.artef == 2):
-            self.health *= 1.2
-    def make_kick(self, enemy, time1):
-        if (isinstance(enemy, Archer) == False):
-            if (self.artef == 1):
-                enemy.health -= self.__damage * 1.1
-            else:
-                enemy.health -= self.__damage
-        else:
-            j = randint(0, 4)
-            if (j == 1):
-                print(f"{enemy.name} \033[32m\033[4mуклонился.")
-            else:
-                if (self.artef == 1):
-                    enemy.health -= self.__damage * 1.1
-                else:
-                    enemy.health -= self.__damage
-                  
-        if enemy.health < 0:
-            enemy.health = 0
-        print(self.name, "бьет", enemy.name)
-        self.health += 7
-        krit = randint(0, 10)
-        if (self.artef == 3):
-            if (krit == 1):
-                enemy.health -= 100
-                print(self.name, "\033[31mНанес критический удар", enemy.name)
-                if enemy.health < 0:
-                    enemy.health = 0
-        if (time1 >= 7 and self.ulta == False):
-            self.ulta = True
-            self.health += 15
-            enemy.health -= 10
-            if enemy.health < 0:
-                enemy.health = 0
-            print(f"{self.name} \033[33mиспользовал свою способность - кинул fireball.")
+        self.health = 1000
+class Phoenix(Person):
+    damage = 20
+    hp = 450
+    def __init__(self):
+        self.name = (Fore.LIGHTRED_EX + "Phoenix")
+        self.health = self.hp
 
 class Soldier(Person):
-    __damage = 25
+    damage = 25
+    timeReastartUlta = 7
     def __init__(self, artef, name='Noname', health=100):
-        self.name = (Fore.GREEN + name + "(Soldier)")
-        super().__init__(artef,health)
-        if (self.artef == 2):
-            self.health *= 1.2
+        self.name = Fore.LIGHTGREEN_EX + (name + "(Soldier)")
+        super().__init__(artef, health)
+    def useUlta(self, enemy):
+        super().useUlta(enemy)
+        enemy.health -= 40
+        print(self.name,Fore.LIGHTYELLOW_EX +"Нанес супер-удар")
 
-    def make_kick(self, enemy, time):
-        if (isinstance(enemy, Archer) == False):
-            if (self.artef == 1):
-                enemy.health -= self.__damage * 1.1
-            else:
-                enemy.health -= self.__damage
-        else:
-            j = randint(0, 6)
-            if (j == 1):
-                print(f"{enemy.name} \033[32m\033[4mуклонился")
-            else:
-                if (self.artef == 1):
-                    enemy.health -= self.__damage * 1.1
-                else:
-                    enemy.health -= self.__damage
-        if enemy.health < 0:
-            enemy.health = 0
-        print(self.name, "бьет", enemy.name)
-        self.health += 10
-        krit = randint(0, 10)
-        if (self.artef == 3):
-            if (krit == 1):
-                enemy.health -= 100
-                print(self.name, "\033[31mНанес критический удар", enemy.name)
-                if enemy.health < 0:
-                    enemy.health = 0
-        if (time >= 5 and self.ulta == False):
-            self.ulta = True
-            enemy.health -= 40
-            if enemy.health < 0:
-                enemy.health = 0
-            print(f"{self.name} \033[33mиспользовал свою способность - нанес супер-удар")
+class Wizzard (Person):
+    damage = 25
+    timeReastartUlta = 9
+    def __init__(self, artef, name='Noname', health=100):
+        self.name =Fore.MAGENTA+  (name + "(Wizzard)")
+        super().__init__(artef, health)
+    def useUlta(self, enemy):
+        super().useUlta(enemy)
+        self.health += 30
+        print(self.name,Fore.LIGHTYELLOW_EX + "Выпил зелье")
+
+class Archer(Person):
+    damage = 30
+    timeReastartUlta = 9
+    def __init__(self, artef, name='Noname', health=100):
+        self.name = Fore.LIGHTBLUE_EX + (name + "(Arhcer)")
+        super().__init__(artef, health)
+    def useUlta(self, enemy):
+        super().useUlta(enemy)
+        enemy.health -= randint(0,3)*self.damage
+        print(self.name,Fore.LIGHTYELLOW_EX + "Отправил град стрел")
+
+class Tank(Person):
+    damage = 10
+    timeReastartUlta = 5
+    def __init__(self, artef, name='Noname', health=100):
+        self.name =  Fore.LIGHTYELLOW_EX +(name + "(Tank)")
+        super().__init__(artef, health)
+    def useUlta(self, enemy):
+        super().useUlta(enemy)
+        self.damage *= 1.25
+        print(self.name,Fore.LIGHTYELLOW_EX + "Улучшил оружие")
 
 class Battle:
-    start = 0
-    end = 0
-    def __init__(self, u1, u2):
-        self.u1 = u1
-        self.u2 = u2
-        self.result = "Сражение не было"
-
-    def battle(self):
-        k1 = 0
-        k2 = 0
-        start = time.time()
-        while self.u1.health > 0 and self.u2.health > 0:
-            n = randint(1, 2)
-            end = time.time() - start
-            if n == 1:
-                self.u1.make_kick(self.u2, end)
-                k2 += 1
-                time.sleep(1)
-            else:
-                self.u2.make_kick(self.u1, end)
-                k1 += 1
-                time.sleep(1)
-            if (k1 == 3):
-                self.u1.hill()
-                k1 = 0
-            if (k2 == 3):
-                self.u2.hill()
-                k2 = 0
-            if (end >= 10 and self.u1.ulta == True and self.u2.ulta == True):
-                self.u1.ulta = False
-                self.u2.ulta = False
-                start = time.time()
-            self.u1.info()
-            self.u2.info()
-            print("--------------------------------------------------")
-        if self.u1.health > self.u2.health:
-            self.result = self.u1.name + "\033[36m- Победил"
-        elif self.u2.health > self.u1.health:
-            self.result = self.u2.name + "\033[36m- Победил"
-
-    def who_win(self):
-        print(self.result)
-
-class Pve:
-    start = 0
-    end = 0
-    start_boss = 0
-    end_boss = 0
-
-    def __init__(self, u1, u2):
-        self.u1 = u1
-        self.u2 = u2
-        self.result = "Сражения не было"
-        self.boss = Boss()
-      
-    def battle(self):
-        k = 0
-        start = time.time()
-        start_boss = time.time()
-        while (self.u1.health > 0 or self.u2.health > 0) and self.boss.health > 0:
-            n = randint(1, 2)
-            end = time.time() - start
-            end_boss = time.time() - start_boss
-            if n == 1:
-                if self.u1.life == True and self.u2.life == True:
-                    self.u1.make_kick(self.boss, end_boss)
-                    self.u2.make_kick(self.boss, end_boss)
-                elif self.u2.life == False:
-                    self.u1.make_kick(self.boss, end_boss)
-                    print (f"{self.u2.name} убит")
-                elif self.u1.life == False:
-                    self.u2.make_kick(self.boss, end_boss)
-                    print(f"{self.u1.name} убит")
-                time.sleep(1)
-            else:
-                n = randint(1, 2)
-                if n == 1 and self.u1.life == True:
-                    self.boss.make_kick(self.u1, end)
-                elif n == 2 and self.u2.life == True:
-                    self.boss.make_kick(self.u2, end)
-                k += 1
-                time.sleep(1)
-            if (k == 3):
-                self.u1.hill()
-                self.u2.hill()
-                k = 0
-            if (end >= 10 and self.u1.ulta == True and self.u2.ulta == True):
-                self.u1.ulta = False
-                self.u2.ulta = False
-                start = time.time()
-            if (end_boss >= 20 and self.boss.ulta == True):
-                self.boss.ulta = False
-                start_boss = time.time()
-            k = randint(0,15)
-            if k == 1:
-                self.boss.splash(self.u1,self.u2)
-            self.u1.info()
-            self.u2.info()
-            self.boss.info()
-            print("--------------------------------------------------")
-        if (self.u1.health or self.u2.health) > self.boss.health:
-            self.result = self.u1.name + " и " + self.u2.name + "\033[36m- Победили"
+    counterRaund = 1
+    timeStartRaund = 0
+    players = []
+    boss = ''
+    def PVP(self, players):
+        self.players = players
+        timeStartUlta = time.time()
+        self.timeStartRaund = timeStartUlta
+        while self.players[0].check_health() and  self.players[1].check_health():
+            self.ControlTimeRaund(time.time() -self.timeStartRaund)
+            self.keypress()
+            self.generate_ulta(timeStartUlta,  self.players)
+        if players[0].health > players[1].health:
+            self.who_win(f"{players[0].name} - победил")
         else:
-            self.result = self.boss.name + "\033[36m- Победил"
+            self.who_win(f"{players[1].name} - победил")
 
-    def who_win(self):
-        print(self.result)
-
-def generator(player):
-    hp1 = randint(150, 200)
-    hp2 = randint(130, 170)
-    hp3 = randint(100, 150)
-    hp4 = randint(250, 300)
-    while True:
-        print("Выбери персонажа:")
-        print(Style.BRIGHT + Fore.GREEN + f"1 - Soldier. HP - {hp1}")
-        print(Style.BRIGHT + Fore.MAGENTA + f"2 - Wizzard. HP - {hp2}")
-        print(Style.BRIGHT + Fore.BLUE + f"3 - Archer. HP - {hp3}")
-        print(Style.BRIGHT + Fore.CYAN + f"4 - Tank. HP - {hp4}")
-        i = int(input())
-        if i>4:
-            print(Style.BRIGHT + Fore.RED + "\033[3m\033[4mВыбери персонажа из предложенных вариантов!")
-            continue
-        print("Выбери артефакт: ")
-        print(Style.BRIGHT + Fore.YELLOW + "1.Доп. урон +10%")
-        print(Style.BRIGHT + Fore.CYAN + "2.Доп. hp +20%")
-        print(Style.BRIGHT + Fore.RED + "3.Возможность крит.удара")
-        ar = int(input())
-        if ar>3:
-            print(Style.BRIGHT + Fore.RED + "\033[3m\033[4mВыбери артефакт из предложенных вариантов!")
-            continue
-        if (i == 1):
-            return Soldier(ar, player, hp1)
-        elif (i == 2):
-            return Wizzard(ar, player, hp2)
-        elif (i == 3):
-            return Archer(ar, player, hp3)
-        elif (i == 4):
-            return Tank(ar, player, hp4)
-
-class Pve1:
-    start = 0
-    end = 0
-    start_boss = 0
-    end_boss = 0
-
-    def __init__(self, u1, u2):
-        self.u1 = u1
-        self.u2 = u2
-        self.result = "Сражения не было"
+    def PVE(self,players):
+        self.players = players
+        timeStartUlta = time.time()
+        self.timeStartRaund = timeStartUlta
         self.boss = Boss()
-
-    def battle(self):
-        k = 0
-        start = time.time()
-        start_boss = time.time()
-        while (self.u1.health > 0 or self.u2.health > 0) and self.boss.health > 0:
-            n = randint(1, 2)
-            end = time.time() - start
-            end_boss = time.time() - start_boss
-            if n == 1:
-                if self.u1.life == True and self.u2.life == True:
-                    self.u1.make_kick(self.boss, end_boss)
-                    self.u2.make_kick(self.boss, end_boss)
-                elif self.u2.life == False:
-                    self.u1.make_kick(self.boss, end_boss)
-                    print (f"{self.u2.name} убит")
-                elif self.u1.life == False:
-                    self.u2.make_kick(self.boss, end_boss)
-                    print(f"{self.u1.name} убит")
-                time.sleep(1)
-            else:
-                n = randint(1, 2)
-                if n == 1 and self.u1.life == True:
-                    self.boss.make_kick(self.u1, end)
-                elif n == 2 and self.u2.life == True:
-                    self.boss.make_kick(self.u2, end)
-                k += 1
-                time.sleep(0.5)
-            if (k == 3):
-                self.u1.hill()
-                self.u2.hill()
-                k = 0
-            if (end >= 10 and self.u1.ulta == True and self.u2.ulta == True):
-                self.u1.ulta = False
-                self.u2.ulta = False
-                start = time.time()
-            if (end_boss >= 50 and self.boss.ulta == True):
-                self.boss.ulta = False
-                start_boss = time.time()
-            k = randint(0,33)
-            if k == 1:
-                self.boss.splash(self.u1,self.u2)
-            self.u1.info()
-            self.u2.info()
-            self.boss.info()
-            print("--------------------------------------------------")
-        if (self.u1.health or self.u2.health) > self.boss.health:
-            self.result = self.u1.name + " и " + self.u2.name + "\033[36m- Победили"
+        while (self.players[0].check_health() or self.players[1].check_health()) and self.boss.check_health():
+            self.ControlTimeRaund(time.time() - self.timeStartRaund)
+            self.keypress()
+            self.generate_ulta(timeStartUlta, self.players)
+        if players[0].health or players[1].health > self.boss.health:
+            self.who_win(f"{players[0].name} и {players[0].name} - победили")
         else:
-            self.result = self.boss.name + "\033[36m- Победил"
+            self.who_win(f"{self.boss.name} - победил")
 
-    def who_win(self):
-        print(self.result)
+    def Arena(self,players):
+        self.players = players
+        self.wave = 1
+        timeStartUlta = time.time()
+        self.timeStartRaund = timeStartUlta
+        self.boss = Phoenix()
+        while self.players[0].check_health() or self.players[1].check_health() or self.players[2].check_health():
+            self.ControlTimeRaund(time.time() - self.timeStartRaund)
+            self.keypress()
+            self.generate_ulta(timeStartUlta, self.players)
+        self.who_win(Fore.LIGHTCYAN_EX + f"Вы продержались {self.wave} волн")
 
-def generator(player):
-    hp1 = randint(150, 200)
-    hp2 = randint(130, 170)
-    hp3 = randint(100, 150)
-    hp4 = randint(250, 300)
-    while True:
-        print("Выбери персонажа:")
-        print(Style.BRIGHT + Fore.GREEN + f"1 - Soldier. HP - {hp1}")
-        print(Style.BRIGHT + Fore.MAGENTA + f"2 - Wizzard. HP - {hp2}")
-        print(Style.BRIGHT + Fore.BLUE + f"3 - Archer. HP - {hp3}")
-        print(Style.BRIGHT + Fore.CYAN + f"4 - Tank. HP - {hp4}")
-        i = int(input())
-        if i>4:
-            print(Style.BRIGHT + Fore.RED + "\033[3m\033[4mВыбери персонажа из предложенных вариантов!")
-            continue
-        print("Выбери артефакт: ")
-        print(Style.BRIGHT + Fore.YELLOW + "1.Доп. урон +10%")
-        print(Style.BRIGHT + Fore.CYAN + "2.Доп. hp +20%")
-        print(Style.BRIGHT + Fore.RED + "3.Возможность крит.удара")
-        ar = int(input())
-        if ar>3:
-            print(Style.BRIGHT + Fore.RED + "\033[3m\033[4mВыбери артефакт из предложенных вариантов!")
-            continue
-        if (i == 1):
-            return Soldier(ar, player, hp1)
-        elif (i == 2):
-            return Wizzard(ar, player, hp2)
-        elif (i == 3):
-            return Archer(ar, player, hp3)
-        elif (i == 4):
-            return Tank(ar, player, hp4)
+    def keypress(self):
+        with keyboard.Events() as events:
+            event = events.get(0.1)
+            if event is None:
+                pass
+            elif event.key == keyboard.Key.ctrl_r:
+                self.secondUlta()
+            elif event.key == keyboard.Key.ctrl_l:
+                self.firstUlta()
+            elif event.key == keyboard.Key.num_lock and isinstance(self.boss,Phoenix):
+                self.thirdUlta()
+    def generate_ulta(self, clock, players):
+        clock = time.time() - clock
+        for player in players:
+            if round(clock) % player.timeReastartUlta == player.timeReastartUlta - 1:
+                player.ulta = True
+    def who_win(self, result):
+        print(result)
+    def whoIsAttack(self, total):
+        if isinstance(self.boss,Boss):
+            attack = randint(1,3)
+            if attack == 1 and self.players[0].check_health():self.players[0].make_kick(self.boss)
+            elif attack == 2 and self.players[1].check_health():self.players[1].make_kick(self.boss)
+            elif attack == 3:self.boss_attack(total)
+            elif not self.players[0].check_health():self.players[1].make_kick(self.boss)
+            elif not self.players[1].check_health():self.players[0].make_kick(self.boss)
+        elif isinstance(self.boss,Phoenix):
+            if randint (1,2) == 1:
+                for person in total:
+                    person.make_kick(self.boss)
+            else:self.boss_attack(total)
+        else:
+            if randint(1,2) == 1:
+                self.players[0].make_kick(self.players[1])
+            else:
+                self.players[1].make_kick(self.players[0])
+    def printUltaReady(self, players):
+        for player in players:
+            if player.ulta == True and player.check_health():
+                print(player.name,Fore.LIGHTBLUE_EX + "Ульта Готова")
+    def printRaund(self):
+        if isinstance(self.boss,Phoenix):
+            print(Fore.LIGHTMAGENTA_EX + f'------------- Волна {self.wave} Раунд {self.counterRaund} -------------')
+        else:
+            print(Fore.LIGHTMAGENTA_EX + f'------------- Раунд {self.counterRaund} -------------')
+        self.counterRaund += 1
+    def firstUlta(self):
+        if self.players[0].ulta == True and self.players[0].check_health():
+            time.sleep(0.3)
+            if isinstance(self.boss, (Boss,Phoenix)):self.players[0].useUlta(self.boss)
+            else: self.players[0].useUlta(self.players[1])
+    def secondUlta(self):
+        if self.players[1].ulta == True and self.players[1].check_health():
+            time.sleep(0.3)
+            if isinstance(self.boss, (Boss,Phoenix)):self.players[1].useUlta(self.boss)
+            else:self.players[1].useUlta(self.players[0])
+    def thirdUlta(self):
+        time.sleep(0.3)
+        if self.players[2].ulta == True and self.players[2].check_health():self.players[2].useUlta(self.boss)
+    def ControlTimeRaund(self,clock):
+        if clock >= 1 or self.counterRaund == 1:
+            self.printRaund()
+            self.whoIsAttack(self.players)
+            for player in self.players:
+                player.info()
+            if isinstance(self.boss,(Boss,Phoenix)): self.boss.info()
+            self.printUltaReady(self.players)
+            self.phoenix_life()
+            self.timeStartRaund = time.time()
+    def boss_attack(self, players):
+        attack = randint(1,len(players))
+        list_players = []
+        check_attack = False
+        for index in range(len(players)):
+            if index + 1 == attack and players[index].check_health():
+                self.boss.make_kick(players[index])
+                check_attack = True
+            elif players[index].check_health():
+                list_players.append(players[index])
+        if (not check_attack):
+            attack = randint(1,len(list_players))
+            if attack == 1:
+                self.boss.make_kick(list_players[0])
+            else:
+                self.boss.make_kick(list_players[1])
+    def phoenix_life(self):
+        if isinstance(self.boss,Phoenix) and not self.boss.check_health():
+            Shop().print_shop(self.players, self.wave)
+            self.boss.hp *=1.1
+            self.boss.damage *=1.1
+            self.boss.health = self.boss.hp
+            self.wave +=1
+            self.counterRaund = 1
 
-# ---------main----------
-print(Fore.CYAN + "Выберите режим игры:\n")
-print(Fore.YELLOW + "\033[1m1 - PVE Boss 1 (Бой с боссом)")
-print(Fore.YELLOW + "\033[1m2 - PVE Boss 2 (Бой с боссом)")
-print(Fore.BLUE + "\033[1m3 - PVP (1 на 1)")
-game_ragime = int(input())
-player1 = input(Fore.CYAN + "\033[4m\033[3mПервый игрок: ")
-first = generator(player1)
-player2 = input(Fore.YELLOW + "\033[4m\033[3mВторой игрок: ")
-second = generator(player2)
-if game_ragime == 3:
-    b = Battle(first, second)
-    b.battle()
-    b.who_win()
-elif game_ragime == 1:
-    b = Pve(first, second)
-    b.battle()
-    b.who_win()
-elif game_ragime == 2:
-    b = Pve1(first, second)
-    b.battle()
-    b.who_win()
+class Menu:
+    def __init__(self):
+        self.modes()
+        while True:
+            self.mode = input()
+            if (self.mode.lower() == "pvp" or self.mode == "2"):
+                Battle().PVP(self.createPlayers())
+                break
+            if (self.mode.lower() == "pve" or self.mode =="1"):
+                Battle().PVE(self.createPlayers())
+                break
+            if (self.mode.lower() == "Arena" or self.mode =="3"):
+                Battle().Arena(self.createPlayers())
+                break
+            else:
+                print(Fore.LIGHTRED_EX + "Выбери из предложенных вариантов!")
+
+
+    def createPlayers(self):
+        if self.mode.lower() == self.mode == "Arena" or self.mode =="3":
+            player1 = self.createPerson()
+            player2 = self.createPerson()
+            player3 = self.createPerson()
+            return [player1, player2,player3]
+        else:
+            player1 = self.createPerson()
+            player2 = self.createPerson()
+            return [player1, player2]
+
+    def modes(self):
+        print(Fore.BLUE+'Выберите режим игры:\n',
+              Fore.CYAN +'1 - PVE (Бой с боссом)\n',
+              Fore.LIGHTGREEN_EX +'2 - PVP (1 на 1)\n',
+              Fore.RED+'3 - Arena (3 против Феникса)')
+    def printChooseCharecter(self):
+        self.random_health()
+        print(Fore.LIGHTGREEN_EX+f'1 - Soldier. HP - {self.health_lst[2]}\n'+
+              Fore.MAGENTA + f'2 - Wizzard. HP - {self.health_lst[3]}\n' +
+              Fore.LIGHTBLUE_EX + f"3 - Archer. HP - {self.health_lst[1]}\n" +
+              Fore.LIGHTYELLOW_EX +f"4 - Tank. HP - {self.health_lst[0]}")
+    def printChooseArtefact(self):
+        print(Fore.LIGHTCYAN_EX+'1.Доп. урон +10%\n'+
+              Fore.LIGHTGREEN_EX+"2.Доп. hp +20%\n" +
+              Fore.LIGHTRED_EX+"3.Возможность крит.удара")
+    def createPerson(self):
+        name = input(Fore.LIGHTWHITE_EX + 'Name = ')
+        while True:
+            try:
+                self.printChooseCharecter()
+                type = Choose_Person(int(input()))
+                self.printChooseArtefact()
+                artefact = Choose_Artefact(int(input()))
+            except:
+                print (Fore.LIGHTRED_EX + f"Выбери цифрой персонажа и артефакт!")
+                continue
+            if type == Choose_Person.Tank:
+                return Tank(artefact,name, self.health_lst[0])
+            if type == Choose_Person.Archer:
+                return Archer(artefact, name, self.health_lst[1])
+            if type == Choose_Person.Soldier:
+                return Soldier(artefact, name, self.health_lst[2])
+            return Wizzard(artefact, name, self.health_lst[3])
+    def random_health(self):
+        tank_hp = randint(250,300)
+        archer_hp = randint(110, 160)
+        soldier_hp = randint(150, 200)
+        wizzard_hp = randint(130, 170)
+        self.health_lst = [tank_hp, archer_hp, soldier_hp, wizzard_hp]
+
+if __name__ == "__main__":
+    menu = Menu()
+
